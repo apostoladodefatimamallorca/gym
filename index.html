@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Core Fuerza"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<title>Core y Fuerza</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0f;color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh}
+#app{max-width:440px;margin:0 auto;padding:24px 16px 48px}
+.bb{font-family:'Bebas Neue',serif}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes glow{0%,100%{box-shadow:0 8px 40px rgba(249,115,22,.4)}50%{box-shadow:0 8px 60px rgba(249,115,22,.7)}}
+.fade{animation:fadeUp .35s ease both}
+.glow{animation:glow 2.5s ease infinite}
+button{font-family:'DM Sans',sans-serif;cursor:pointer;border:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ============================================================
+// AUDIO — single context, unlocked once on first user tap
+// ============================================================
+var AC = null;
+
+function unlockAudio() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === 'suspended') AC.resume();
+}
+
+function playBell() {
+  if (!AC) return;
+  if (AC.state === 'suspended') { AC.resume(); }
+  var t = AC.currentTime;
+  var gain = AC.createGain();
+  gain.gain.setValueAtTime(0.4, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+  gain.connect(AC.destination);
+  [1046, 1318].forEach(function(freq) {
+    var osc = AC.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    osc.start(t);
+    osc.stop(t + 0.9);
+  });
+}
+
+// ============================================================
+// DATA
+// ============================================================
+var EX = [
+  { name:"Plancha Frontal", cat:"CORE", em:"💪",
+    series:3, reps:"30 seg", rest:20, col:"#f97316",
+    isTime:true, secs:30, sides:false,
+    mp:["Core completo","Transverso abdominal"], ms:["Hombros","Glúteos"],
+    steps:["Apóyate en antebrazos y puntas de los pies",
+           "Cuerpo recto de cabeza a talones",
+           "Abdomen contraído — sin hundir ni elevar caderas",
+           "Cuello neutro, mirada al suelo",
+           "Respira con normalidad durante todo el tiempo"],
+    tip:"Si la cadera cae, reduce el tiempo y hazlo bien." },
+
+  { name:"Dead Bug", cat:"CORE", em:"🪲",
+    series:3, reps:"10 cada lado", rest:20, col:"#f97316",
+    isTime:false, secs:0, sides:false,
+    mp:["Transverso abdominal","Multífidos"], ms:["Recto abdominal","Psoas"],
+    steps:["Tumbado boca arriba, brazos hacia el techo",
+           "Caderas y rodillas a 90 grados, piernas en el aire",
+           "Zona lumbar PEGADA al suelo — lo más importante",
+           "Exhala y baja brazo derecho y pierna izquierda lentamente",
+           "Vuelve al inicio e intercambia lados"],
+    tip:"Si la lumbar se despega, reduce el rango." },
+
+  { name:"Plancha Lateral", cat:"CORE", em:"⚡",
+    series:3, reps:"25 seg cada lado", rest:20, col:"#f97316",
+    isTime:true, secs:25, sides:true,
+    mp:["Oblicuos interno y externo"], ms:["Glúteo medio","Cuadrado lumbar"],
+    steps:["Apóyate en un antebrazo y lateral del pie",
+           "Cuerpo en línea recta diagonal",
+           "Brazo libre extendido hacia arriba",
+           "25 seg lado izquierdo, luego 25 seg lado derecho",
+           "La campanita indica cuándo cambiar de lado"],
+    tip:"Apoya el pie de arriba delante para más estabilidad." },
+
+  { name:"Sentadilla", cat:"PIERNAS", em:"🦵",
+    series:3, reps:"12 reps", rest:30, col:"#3b82f6",
+    isTime:false, secs:0, sides:false,
+    mp:["Cuádriceps","Glúteos"], ms:["Isquiotibiales","Gemelos","Core"],
+    steps:["Pies a anchura de hombros, puntas hacia fuera",
+           "Baja como si fueras a sentarte en una silla",
+           "Rodillas siguiendo los pies, nunca hacia dentro",
+           "Espalda recta, pecho arriba, mirada al frente",
+           "Sube empujando con los talones"],
+    tip:"Si las rodillas van hacia dentro, abre más los pies." },
+
+  { name:"Flexiones", cat:"TREN SUPERIOR", em:"🏋️",
+    series:3, reps:"10 reps", rest:30, col:"#8b5cf6",
+    isTime:false, secs:0, sides:false,
+    mp:["Pectoral mayor","Tríceps"], ms:["Deltoides anterior","Core"],
+    steps:["Manos algo más anchas que los hombros",
+           "Cuerpo recto de cabeza a talones",
+           "Baja el pecho hasta casi tocar el suelo",
+           "Codos a 45 grados del cuerpo",
+           "Si es difícil, apoya las rodillas"],
+    tip:"Bajada controlada 2 seg. Subida puede ser explosiva." },
+
+  { name:"Glute Bridge", cat:"GLUTEOS+CORE", em:"🍑",
+    series:3, reps:"15 reps", rest:20, col:"#10b981",
+    isTime:false, secs:0, sides:false,
+    mp:["Glúteo mayor"], ms:["Isquiotibiales","Core","Suelo pélvico"],
+    steps:["Tumbado boca arriba, rodillas dobladas, pies en suelo",
+           "Sube la cadera empujando con los talones",
+           "Aprieta glúteos y mantén 2 segundos arriba",
+           "Baja lentamente sin dejar caer la cadera",
+           "La espalda baja no debe arquearse"],
+    tip:"La pausa de 2 seg arriba es clave para la eficacia." }
+];
+
+var TOTAL_S = EX.reduce(function(a,e){return a+e.series;},0);
+var CIRC = 2 * Math.PI * 54;
+
+// ============================================================
+// STATE
+// ============================================================
+var ei = 0;   // exercise index
+var sr = 1;   // current serie
+var sd = 0;   // side: 0=left/only, 1=right
+var ds = 0;   // done series (for progress bar)
+
+// Timer state
+var exCount  = 0;    // counts UP from 0 to secs
+var restCount = 0;   // counts DOWN from rest to 0
+var phase = "idle";  // "idle" | "ex" | "rest"
+var sst = false;     // showSteps
+var ast = -1;        // activeStep
+
+// RAF handles
+var rafEx = 0, rafRest = 0, pendTmr = 0;
+var exStart = 0; // timestamp when exercise timer started
+var restEnd = 0; // timestamp when rest timer ends
+
+// ============================================================
+// TIMER ENGINE — uses real clock, RAF for smooth animation
+// ============================================================
+
+function stopAll() {
+  cancelAnimationFrame(rafEx);   rafEx = 0;
+  cancelAnimationFrame(rafRest); rafRest = 0;
+  clearTimeout(pendTmr);         pendTmr = 0;
+}
+
+// Exercise timer counts UP: 0 → secs
+function startExTimer(targetSecs, onComplete) {
+  stopAll();
+  exStart = Date.now();
+  phase = "ex";
+
+  function tick() {
+    var elapsed = Math.floor((Date.now() - exStart) / 1000);
+    var display = Math.min(elapsed, targetSecs);
+
+    // Update only the number and arc — not the whole page
+    var numEl = document.getElementById("ex-num");
+    var arcEl = document.getElementById("ex-arc");
+    if (numEl) numEl.textContent = display;
+    if (arcEl) {
+      var pct = display / targetSecs;
+      var offset = CIRC * (1 - pct);
+      arcEl.style.strokeDashoffset = offset;
+    }
+
+    if (display < targetSecs) {
+      rafEx = requestAnimationFrame(tick);
+    } else {
+      phase = "idle";
+      playBell();
+      pendTmr = setTimeout(onComplete, 900);
+    }
+  }
+
+  rafEx = requestAnimationFrame(tick);
+}
+
+// Rest timer counts DOWN: rest → 0
+function startRestTimer(restSecs, onComplete) {
+  stopAll();
+  restEnd = Date.now() + restSecs * 1000;
+  phase = "rest";
+
+  function tick() {
+    var rem = Math.ceil((restEnd - Date.now()) / 1000);
+    if (rem < 0) rem = 0;
+
+    var numEl = document.getElementById("rest-num");
+    var arcEl = document.getElementById("rest-arc");
+    if (numEl) numEl.textContent = rem;
+    if (arcEl) {
+      var pct = rem / restSecs;
+      var offset = CIRC * (1 - pct);
+      arcEl.style.strokeDashoffset = offset;
+    }
+
+    if (rem > 0) {
+      rafRest = requestAnimationFrame(tick);
+    } else {
+      phase = "idle";
+      playBell();
+      pendTmr = setTimeout(onComplete, 900);
+    }
+  }
+
+  rafRest = requestAnimationFrame(tick);
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+
+function goToRest() {
+  var e = EX[ei];
+  ds++;
+  renderRest(e);
+  startRestTimer(e.rest, function() {
+    goNextAfterRest();
+  });
+}
+
+function goNextAfterRest() {
+  var e = EX[ei];
+  if (sr < e.series) {
+    sr++;
+    goToExercise(true); // auto-start
+  } else {
+    // Move to next exercise
+    ei++;
+    sr = 1;
+    sd = 0;
+    if (ei < EX.length) {
+      goToExercise(true); // auto-start
+    } else {
+      renderSummary();
+    }
+  }
+}
+
+// goToExercise: if autoStart=true, begin timer automatically
+function goToExercise(autoStart) {
+  sst = false; ast = -1;
+  renderWorkout();
+  if (autoStart && EX[ei].isTime) {
+    // Small delay so screen renders first, then auto-start
+    pendTmr = setTimeout(function() {
+      runExerciseTimer();
+    }, 400);
+  }
+}
+
+function runExerciseTimer() {
+  var e = EX[ei];
+  playBell(); // clic to signal start
+  exCount = 0;
+  renderWorkout(); // show running state
+
+  startExTimer(e.secs, function() {
+    if (e.sides && sd === 0) {
+      // Switch to right side
+      sd = 1;
+      renderWorkout();
+      pendTmr = setTimeout(function() {
+        runExerciseTimer();
+      }, 600);
+    } else {
+      sd = 0;
+      goToRest();
+    }
+  });
+}
+
+// ============================================================
+// RENDER HELPERS
+// ============================================================
+
+function col(e) { return e ? e.col : "#f97316"; }
+
+function progressBar(e) {
+  var prog = Math.round((ds / TOTAL_S) * 100);
+  return "<div style='display:flex;align-items:center;gap:12px;margin-bottom:18px'>"
+    + "<button onclick='doReset()' style='background:#111118;border:1px solid #1f1f2e;border-radius:10px;"
+    + "color:#71717a;width:36px;height:36px;font-size:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center'>←</button>"
+    + "<div style='flex:1'>"
+    + "<div style='display:flex;justify-content:space-between;margin-bottom:5px'>"
+    + "<span style='font-size:10px;color:#3f3f46;letter-spacing:1px'>EJERCICIO " + (ei+1) + "/" + EX.length + "</span>"
+    + "<span style='font-size:10px;color:#3f3f46'>" + prog + "%</span></div>"
+    + "<div style='background:#17171f;border-radius:99px;height:5px'>"
+    + "<div style='height:100%;border-radius:99px;background:linear-gradient(90deg," + col(e) + "," + col(e) + "88);width:" + prog + "%;transition:width .6s'></div>"
+    + "</div></div></div>";
+}
+
+// Static SVG circle shell — the arc and number are updated via DOM, not re-rendered
+function circleShell(idNum, idArc, col, sz) {
+  sz = sz || 140;
+  return "<div style='position:relative;width:" + sz + "px;height:" + sz + "px;margin:0 auto'>"
+    + "<svg width='" + sz + "' height='" + sz + "' viewBox='0 0 140 140' style='position:absolute;inset:0;transform:rotate(-90deg)'>"
+    + "<circle cx='70' cy='70' r='54' fill='none' stroke='#1a1a25' stroke-width='8'/>"
+    + "<circle id='" + idArc + "' cx='70' cy='70' r='54' fill='none' stroke='" + col + "' stroke-width='8'"
+    + " stroke-linecap='round' stroke-dasharray='" + CIRC + "' stroke-dashoffset='" + CIRC + "'"
+    + " style='transition:stroke-dashoffset 0.25s linear'/>"
+    + "</svg>"
+    + "<div style='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center'>"
+    + "<div id='" + idNum + "' class='bb' style='font-size:" + (sz===160?52:44) + "px;line-height:1;color:#52525b'>0</div>"
+    + "<div style='font-size:9px;color:#3f3f46;letter-spacing:2px;margin-top:2px'>SEG</div>"
+    + "</div></div>";
+}
+
+function seriesBars(e) {
+  return "<div style='display:flex;gap:7px;margin-bottom:16px'>"
+    + Array.from({length:e.series}).map(function(_,i){
+        return "<div style='height:5px;flex:1;border-radius:99px;background:" + (i<sr?e.col:"#1f1f2e") + ";transition:background .3s'></div>";
+      }).join("")
+    + "</div>";
+}
+
+function musclesTags(e) {
+  return "<div style='margin-bottom:16px'>"
+    + "<div style='font-size:10px;color:#3f3f46;letter-spacing:2px;margin-bottom:8px'>MUSCULOS</div>"
+    + "<div style='display:flex;flex-wrap:wrap;gap:6px'>"
+    + e.mp.map(function(m){return "<span style='background:"+e.col+"18;border:1px solid "+e.col+"35;border-radius:8px;padding:4px 10px;font-size:12px;color:"+e.col+";font-weight:600'>"+m+"</span>";}).join("")
+    + e.ms.map(function(m){return "<span style='background:#17171f;border:1px solid #27272a;border-radius:8px;padding:4px 10px;font-size:12px;color:#52525b'>"+m+"</span>";}).join("")
+    + "</div></div>";
+}
+
+function stepsSection(e) {
+  var btn = "<button onclick='togSteps()' style='background:" + (sst?e.col+"12":"#17171f") + ";border:1px solid " + (sst?e.col+"35":"#27272a") + ";"
+    + "border-radius:12px;color:" + (sst?e.col:"#71717a") + ";font-size:13px;font-weight:600;padding:10px 16px;"
+    + "width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center'>"
+    + "<span>📋 Como se hace — paso a paso</span><span style='font-size:11px'>" + (sst?"▲":"▼") + "</span></button>";
+  if (!sst) return btn;
+  return btn + "<div style='margin-top:12px'>"
+    + e.steps.map(function(st,i){
+        var a = ast===i;
+        return "<div onclick='togStep("+i+")' style='background:"+(a?e.col+"12":"#17171f")+";border:1px solid "+(a?e.col+"30":"#222230")+";"
+          +"border-radius:12px;padding:10px 14px;display:flex;gap:10px;margin-bottom:6px;cursor:pointer'>"
+          +"<span style='font-size:14px;flex-shrink:0'>"+(i+1)+".</span>"
+          +"<span style='font-size:13px;line-height:1.55;color:"+(a?"#f4f4f5":"#71717a")+";font-weight:"+(a?"600":"400")+"'>"+st+"</span></div>";
+      }).join("")
+    + "<div style='background:#17171f;border:1px solid #222230;border-radius:12px;padding:10px 14px;display:flex;gap:10px'>"
+    + "<span>💡</span><span style='font-size:12px;color:#52525b;line-height:1.55'><strong style='color:#71717a'>Consejo:</strong> "+e.tip+"</span></div>"
+    + "</div>";
+}
+
+// ============================================================
+// SCREEN RENDERERS
+// ============================================================
+
+function renderHome() {
+  var rows = EX.map(function(ex,i){
+    return "<div style='background:#111118;border:1px solid "+ex.col+"22;border-left:3px solid "+ex.col+";"
+      +"border-radius:14px;padding:13px 16px;display:flex;align-items:center;gap:14px;margin-bottom:8px'>"
+      +"<div style='width:42px;height:42px;border-radius:12px;background:"+ex.col+"18;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>"+ex.em+"</div>"
+      +"<div style='flex:1'><div style='font-weight:700;font-size:14px;color:#f4f4f5;margin-bottom:3px'>"+ex.name
+      +" <span style='background:"+ex.col+"18;color:"+ex.col+";border-radius:6px;padding:1px 7px;font-size:9px;font-weight:700;letter-spacing:1px'>"+ex.cat+"</span>"
+      +(ex.isTime?" <span style='background:#1f1f2e;color:#71717a;border-radius:6px;padding:1px 7px;font-size:9px'>⏱</span>":"")
+      +"</div><div style='color:#3f3f46;font-size:12px'>"+ex.series+" series · "+ex.reps+"</div></div>"
+      +"<div class='bb' style='color:#27272a;font-size:22px'>0"+(i+1)+"</div></div>";
+  }).join("");
+
+  document.getElementById("app").innerHTML = "<div class='fade'>"
+    +"<div style='text-align:center;margin-bottom:28px'>"
+    +"<div style='display:inline-block;background:linear-gradient(135deg,#f97316,#ea580c);border-radius:99px;padding:5px 16px;font-size:10px;font-weight:700;letter-spacing:3px;color:#fff;margin-bottom:14px'>PLAN DE ENTRENAMIENTO</div>"
+    +"<h1 class='bb' style='font-size:68px;line-height:.9;letter-spacing:3px;background:linear-gradient(160deg,#fff 30%,#52525b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px'>CORE<br>Y FUERZA</h1>"
+    +"<p style='color:#52525b;font-size:13px'>6 ejercicios · 10-15 min · Sin equipamiento</p></div>"
+    +"<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px'>"
+    +[["🎯","6","EJERCICIOS"],["🔥","18","SERIES"],["📅","3x","SEMANA"]].map(function(d){
+      return "<div style='background:#111118;border:1px solid #1f1f2e;border-radius:16px;padding:14px 8px;text-align:center'>"
+        +"<div style='font-size:20px;margin-bottom:5px'>"+d[0]+"</div>"
+        +"<div class='bb' style='font-size:28px;color:#fff;line-height:1'>"+d[1]+"</div>"
+        +"<div style='font-size:10px;color:#3f3f46;letter-spacing:1px;margin-top:2px'>"+d[2]+"</div></div>";
+    }).join("")+"</div>"
+    +rows
+    +"<button class='glow' onclick='doStart()' style='background:linear-gradient(135deg,#f97316,#ea580c);border-radius:16px;color:#fff;font-size:15px;font-weight:700;padding:18px;width:100%;letter-spacing:1px;margin-top:4px'>COMENZAR ENTRENAMIENTO →</button>"
+    +"</div>";
+}
+
+function renderWorkout() {
+  var e = EX[ei];
+  var isRunning = phase === "ex";
+  var sideCol = sd===0 ? "#3b82f6" : "#10b981";
+  var sideLabel = sd===0 ? "◀ LADO IZQUIERDO" : "▶ LADO DERECHO";
+  var timerCol = e.sides ? sideCol : e.col;
+
+  var timerBlock = "";
+  if (e.isTime) {
+    var sideDiv = e.sides
+      ? "<div style='margin-bottom:12px;background:"+sideCol+"20;border:2px solid "+sideCol+";border-radius:12px;padding:8px 16px;display:inline-block'>"
+        +"<span class='bb' style='font-size:22px;color:"+sideCol+";letter-spacing:1px'>"+sideLabel+"</span></div>"
+      : "";
+
+    // Show INICIAR only if not yet running and phase is idle
+    var ctrlBtn = "";
+    if (!isRunning) {
+      ctrlBtn = "<button onclick='pressStart()' style='background:linear-gradient(135deg,"+e.col+","+e.col+"bb);"
+        +"border-radius:12px;color:#fff;font-size:15px;font-weight:700;padding:12px 28px'>▶ INICIAR</button>";
+    } else {
+      ctrlBtn = "<button onclick='pressPause()' style='background:#17171f;border:1px solid "+e.col+"50;"
+        +"border-radius:12px;color:"+e.col+";font-size:15px;font-weight:700;padding:12px 28px'>⏸ PAUSAR</button>";
+    }
+
+    timerBlock = "<div style='background:#0d0d14;border:2px solid "+e.col+"50;border-radius:20px;padding:20px 16px;margin-bottom:16px;text-align:center'>"
+      +"<div style='font-size:11px;color:"+e.col+";letter-spacing:2px;font-weight:700;margin-bottom:10px'>⏱ TEMPORIZADOR</div>"
+      +sideDiv
+      +circleShell("ex-num","ex-arc",timerCol,140)
+      +"<div style='display:flex;gap:8px;justify-content:center;margin-top:14px'>"+ctrlBtn+"</div>"
+      +"</div>";
+  }
+
+  var manualBtn = !e.isTime
+    ? "<button onclick='serieHecha()' style='background:linear-gradient(135deg,"+e.col+","+e.col+"bb);"
+      +"border-radius:16px;color:#fff;font-size:14px;font-weight:700;padding:18px;width:100%;letter-spacing:.8px'>"
+      +"✅ SERIE FINALIZADA</button>"
+    : "";
+
+  document.getElementById("app").innerHTML = "<div class='fade'>"
+    +progressBar(e)
+    +"<div style='background:#111118;border:1px solid "+e.col+"28;border-radius:24px;padding:24px;margin-bottom:12px;position:relative;overflow:hidden'>"
+    +"<div style='position:absolute;top:-50px;right:-50px;width:180px;height:180px;border-radius:50%;background:"+e.col+"08;filter:blur(50px);pointer-events:none'></div>"
+    +"<div style='margin-bottom:16px'>"
+    +"<span style='font-size:10px;font-weight:700;letter-spacing:2px;color:"+e.col+";display:block;margin-bottom:6px'>"+e.cat+"</span>"
+    +"<div style='display:flex;align-items:center;gap:12px'><span style='font-size:38px'>"+e.em+"</span>"
+    +"<h2 class='bb' style='font-size:42px;line-height:1;letter-spacing:1px'>"+e.name+"</h2></div></div>"
+    +seriesBars(e)
+    +"<div style='background:"+e.col+"10;border:1px solid "+e.col+"25;border-radius:14px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>"
+    +"<div><div style='font-size:10px;color:#3f3f46;letter-spacing:1px'>SERIE ACTUAL</div>"
+    +"<div class='bb' style='font-size:38px;line-height:1;color:"+e.col+"'>"+sr+" <span style='color:#27272a;font-size:24px'>/ "+e.series+"</span></div></div>"
+    +"<div style='text-align:right'><div style='font-size:10px;color:#3f3f46;letter-spacing:1px'>OBJETIVO</div>"
+    +"<div class='bb' style='font-size:22px;color:#f4f4f5'>"+e.reps+"</div></div></div>"
+    +timerBlock
+    +musclesTags(e)
+    +stepsSection(e)
+    +"</div>"
+    +manualBtn
+    +"</div>";
+}
+
+function renderRest(e) {
+  e = e || EX[ei];
+  document.getElementById("app").innerHTML = "<div class='fade' style='text-align:center'>"
+    +"<div style='font-size:10px;color:#3f3f46;letter-spacing:3px;margin-bottom:28px'>TIEMPO DE RECUPERACION</div>"
+    +circleShell("rest-num","rest-arc",e.col,160)
+    +"<div style='background:#111118;border:1px solid "+e.col+"22;border-radius:16px;padding:16px 20px;margin:24px 0;text-align:left'>"
+    +"<div style='font-size:10px;color:#3f3f46;letter-spacing:2px;margin-bottom:8px'>SIGUIENTE</div>"
+    +"<div style='display:flex;align-items:center;gap:12px'><span style='font-size:26px'>"+e.em+"</span>"
+    +"<div><div style='font-weight:700;font-size:15px;color:#f4f4f5'>"+e.name+" — Serie "+sr+"</div>"
+    +"<div style='font-size:12px;color:#3f3f46;margin-top:2px'>"+e.reps+"</div></div></div></div>"
+    +"<button onclick='skipRest()' style='background:#17171f;border:1px solid #27272a;border-radius:14px;"
+    +"color:#71717a;font-size:14px;font-weight:600;padding:14px 40px'>Saltar descanso →</button>"
+    +"</div>";
+
+  // Init rest circle to full
+  var arcEl = document.getElementById("rest-arc");
+  var numEl = document.getElementById("rest-num");
+  if (arcEl) arcEl.style.strokeDashoffset = 0;
+  if (numEl) numEl.textContent = e.rest;
+}
+
+function renderSummary() {
+  document.getElementById("app").innerHTML = "<div class='fade' style='text-align:center'>"
+    +"<div style='font-size:56px;margin-bottom:14px'>🏆</div>"
+    +"<h2 class='bb' style='font-size:56px;line-height:1;letter-spacing:2px;background:linear-gradient(135deg,#fbbf24,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px'>COMPLETADO</h2>"
+    +"<p style='color:#52525b;font-size:13px;margin-bottom:24px'>Has trabajado todos los grupos musculares</p>"
+    +EX.map(function(ex){
+      return "<div style='background:#111118;border:1px solid "+ex.col+"20;border-left:3px solid "+ex.col+";"
+        +"border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;text-align:left;margin-bottom:8px'>"
+        +"<span style='font-size:18px'>✅</span><div style='flex:1'>"
+        +"<div style='font-weight:700;font-size:14px;color:#f4f4f5'>"+ex.name+"</div>"
+        +"<div style='font-size:12px;color:#3f3f46'>"+ex.series+" series · "+ex.reps+"</div></div>"
+        +"<span style='background:"+ex.col+"15;color:"+ex.col+";border-radius:8px;padding:2px 8px;font-size:9px;font-weight:700'>"+ex.cat+"</span></div>";
+    }).join("")
+    +"<button onclick='doReset()' style='background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:16px;"
+    +"color:#fff;font-size:15px;font-weight:700;padding:18px;width:100%;margin-top:16px'>VOLVER AL INICIO 🏠</button>"
+    +"</div>";
+}
+
+// ============================================================
+// BUTTON HANDLERS
+// ============================================================
+
+function doStart() {
+  unlockAudio();
+  ei=0; sr=1; sd=0; ds=0; phase="idle"; sst=false; ast=-1;
+  goToExercise(false); // show workout screen, wait for tap
+}
+
+function pressStart() {
+  // This IS the user gesture — unlock audio here
+  unlockAudio();
+  runExerciseTimer();
+}
+
+function pressPause() {
+  stopAll();
+  phase = "idle";
+  renderWorkout();
+}
+
+function serieHecha() {
+  // Manual: serie done for rep-based exercises
+  stopAll();
+  goToRest();
+}
+
+function skipRest() {
+  stopAll();
+  goNextAfterRest();
+}
+
+function togSteps() { sst=!sst; ast=-1; renderWorkout(); }
+function togStep(i) { ast=ast===i?-1:i; renderWorkout(); }
+
+function doReset() {
+  stopAll();
+  ei=0; sr=1; sd=0; ds=0; phase="idle"; sst=false; ast=-1;
+  renderHome();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderHome();
+</script>
+<script>if("serviceWorker"in navigator)window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});</script>
+</body>
+</html>
